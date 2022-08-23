@@ -1,0 +1,135 @@
+from joblib import dump, load
+import numpy as np
+from sklearn import decomposition
+from matplotlib import pyplot as plt
+from CosinorPy import file_parser, cosinor, cosinor1
+import pandas as pd
+import os
+import math
+from sklearn import linear_model
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVR
+from sklearn import svm
+from sklearn.kernel_ridge import KernelRidge
+from sklearn.linear_model import SGDRegressor
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.cross_decomposition import PLSRegression
+from sklearn import tree
+
+from sklearn.neural_network import MLPRegressor
+from sklearn.linear_model import PassiveAggressiveRegressor
+
+
+import random
+
+COG = []
+with open('list.txt') as R:
+	while 1:
+		line = R.readline()
+		if not line:break
+		gene = line.strip('\n')
+		COG.append(gene)
+
+
+with open('data.txt') as F:
+	indexS = F.readline().strip('\n').split('\t')[1:]
+	data = [[] for _ in indexS]
+	print (indexS)
+	geneS = []
+	while 1:
+		line = F.readline()
+		if not line:break
+		#if random.random() > 0.5:continue
+		gene = line.split('\t')[0]
+		if not gene in COG:continue
+		spline = line.strip('\n').split('\t')[1:]
+		for n in range(len(spline)):
+			data[n].append(float(spline[n]))
+		geneS.append(line.split('\t')[0])
+
+trainY = [1,1,1,5,5,5,9,9,9,13,13,13,17,17,17,21,21,21]
+trainX = data[0:18]
+
+def angle_between(p1, p2):
+	    ang1 = np.arctan2(*p1[::-1])
+	    ang2 = np.arctan2(*p2[::-1])
+	    return np.rad2deg((ang1 - ang2) % (2 * np.pi))
+
+def train_Model(trainX,trainY):
+	N = 3
+	angleRevisorS = [k/N*math.pi*2 for k in range(N)]
+	#print (angleRevisorS)
+	#angleRevisorS = [0]
+	modelS_cos = [linear_model.Ridge(alpha=0.5, normalize=True, solver='svd') for _ in range(N)]
+	modelS_sin = [linear_model.Ridge(alpha=0.5, normalize=True, solver='svd') for _ in range(N)]
+	#modelS_cos = [SVR() for _ in range(N)]
+	#modelS_sin = [SVR() for _ in range(N)]
+
+	for k in range(N):
+		angleRevisor = angleRevisorS[k]
+		trainY_cos = [math.cos(2*math.pi*angle/24+angleRevisor) for angle in trainY]
+		trainY_sin = [math.sin(2*math.pi*angle/24+angleRevisor) for angle in trainY]
+		modelS_cos[k].fit(trainX,trainY_cos)
+		modelS_sin[k].fit(trainX,trainY_sin)
+	return modelS_cos, modelS_sin, angleRevisorS
+
+def transform_Model(modelS_cos, modelS_sin, angleRevisorS, target):
+	N = len(angleRevisorS)
+	xS = []
+	yS = []
+	for n in range(N):
+		pre_cos = modelS_cos[n].predict(target)[0]
+		pre_sin = modelS_sin[n].predict(target)[0]
+		pre_angle = angle_between((pre_cos,pre_sin),(1,0))*math.pi*2/360
+		pre_angle = pre_angle - angleRevisorS[n]
+		pre_x = math.cos(pre_angle)
+		pre_y = math.sin(pre_angle)
+		xS.append(pre_x)
+		yS.append(pre_y)
+	x = np.mean(xS)
+	y = np.mean(yS)
+	#print (x,y)
+	result = angle_between((x,y),(1,0))*24/360
+	return result
+
+
+def getGene(g):
+	young = []
+	old = []
+	for n in range(18):
+		young.append(data[n][g])
+		old.append(data[n+18][g])
+	return young, old
+
+
+
+
+for t in range(6):
+
+	new_trainX = []
+	new_trainY = []
+	new_testX = []
+	new_testY = []
+	for m in range(6):
+		if t != m:
+			for k in range(3):
+				new_trainY.append(trainY[3*m+k])
+				new_trainX.append(trainX[3*m+k])
+		if t == m:
+			for k in range(3):
+				new_testX.append(trainX[3*m+k])
+				new_testY.append(trainY[3*m+k])
+			#new_trainY.append(trainY[3*m])
+			#new_trainX.append(trainX[3*m])
+	modelS_cos, modelS_sin, angleRevisorS = train_Model(new_trainX,new_trainY)
+	#print (new_trainY, new_testY)
+	for n in range(3):
+		print(transform_Model(modelS_cos, modelS_sin, angleRevisorS, [new_testX[n]]),t)
+	#for n in range(18):
+	#	print(transform_Model(modelS_cos, modelS_sin, angleRevisorS, [data[n+18]]),n)
+
+modelS_cos, modelS_sin, angleRevisorS = train_Model(trainX,trainY)
+for n in range(18):
+		print(transform_Model(modelS_cos, modelS_sin, angleRevisorS, [data[n+18]]),n)
