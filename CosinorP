@@ -1,0 +1,128 @@
+import calculationS as cal
+import visualizationS as vis
+from matplotlib import pyplot as plt
+import math
+import numpy as np
+import os
+from sklearn.decomposition import PCA
+from CosinorPy import file_parser, cosinor, cosinor1
+import numpy as np
+import pandas as pd
+
+
+plt.rcParams["figure.figsize"] = (12,6)
+
+with open('data2.txt') as F:
+	line = F.readline()
+	headS = line.strip('\n').split('\t')
+	N = len(headS)
+	sampleS = [headS[n*3+1] for n in range(int(N/3))]
+	geneS = []
+	mainData = dict()
+	for sample in sampleS:mainData[sample] = dict()
+	while 1:
+		line = F.readline()
+		if not line:break
+		linedata = line.strip('\n').split('\t')
+		gene = linedata[0]
+		geneS.append(gene)
+		for sample_n in range(int(N/3)):
+			sample = sampleS[sample_n]
+			mainData[sample][gene] = [float(linedata[sample_n*3+1+k]) for k in range(3)]
+
+def getData(sample, gene):
+	tempSampleS = [sampleS[k] for k in sample2numS[sample]]
+	data = [mainData[sample][gene] for sample in tempSampleS]
+	return data
+
+sample2numS = dict()
+sample2numS['col_y'] = range(6)
+sample2numS['ore_y'] = range(6,12)
+sample2numS['col_o'] = range(12,18)
+sample2numS['ore_o'] = range(18,24)
+
+data_young = []
+
+newGeneS = []
+trueGeneS = []
+geneS = geneS#[:100]
+for gene in geneS:
+	check = 1
+	for sample in ['col_y','col_o']:
+		temp = np.array([np.median(dat) for dat in getData(sample,gene)])
+		if sum(temp) == 0:check = 0
+	if check:trueGeneS.append(gene)
+
+print (len(geneS), len(trueGeneS))
+
+
+from matplotlib import pyplot as plt
+
+goodGeneS = []
+sample = 'col_o'
+xS = np.array([1,1,1,5,5,5,9,9,9,13,13,13,17,17,17,21,21,21])
+
+def coPredict(model, x):
+	X_fit = np.linspace(0, 24, 1000)
+	rrr = np.cos(2*np.pi*X_fit/24)
+	sss = np.sin(2*np.pi*X_fit/24)
+	data = pd.DataFrame()
+	data['rrr'] = rrr
+	data['sss'] = sss
+	X_fit = cosinor.generate_independents(X_fit, n_components=2, period=24, lin_comp=False)
+	result = model.predict(X_fit)
+	X_fit = np.array(X_fit)
+	cross = []
+	X_fit = np.linspace(0, 24, 1000)
+	result = np.array(result)
+	result = (result-np.min(result))/(np.max(result)-np.min(result))
+	#print (result)
+
+	#print(X_fit)
+	inc = []
+	dec = []
+	for n in range(len(X_fit)-1):
+		y1 = result[n]
+		y2 = result[n+1]
+		#print (y1, y2)
+		if (y1-0.3) < 0 and (y2-0.3) > 0:
+			inc.append(X_fit[n])
+		if (y1-0.3) > 0 and (y2-0.3) < 0:
+			dec.append(X_fit[n])
+
+	return result, inc, dec, X_fit
+
+masterGeneS = []
+
+goodGeneS = []
+N = 0
+FWHMs= []
+with open('p_cos.txt','w') as R:
+	for gene in geneS:
+		N += 1
+		if N%100 == 0:print (N,len(trueGeneS),len(goodGeneS))
+		#if N > 1000:exit()
+		exp = []
+		for dat in getData('col_y',gene):
+			exp += dat
+		exp = np.array(exp)
+		exp_n_y = (exp-min(exp))/(max(exp)-min(exp))
+		M1 = (cosinor.fit_me(xS,exp_n_y,plot=False,period=24,return_model=True,plot_phase=False,plot_measurements=False))
+
+		F1 = M1[1]['p']
+		exp = []
+		for dat in getData('col_o',gene):
+			exp += dat
+		exp = np.array(exp)
+		exp_n_o = (exp-min(exp))/(max(exp)-min(exp))
+		M2 = (cosinor.fit_me(xS,exp_n_o,plot=False,period=24,return_model=True,plot_phase=False,plot_measurements=False))
+		F2 = M2[1]['p']
+		if 1:
+			R.write(gene+'\t'+str(F1)+'\t'+str(F2)+'\tX\n')
+
+
+
+
+
+
+
