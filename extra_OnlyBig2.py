@@ -1,0 +1,446 @@
+if 1:
+	import numpy as np
+	from joblib import dump, load
+	import tkinter as tk
+	from sklearn.svm import SVC
+	from PIL import ImageTk, Image
+	from matplotlib import pyplot as plt
+	import sys
+	from scipy.signal import savgol_filter
+	from scipy.signal import find_peaks
+	from joblib import dump, load
+	import os
+
+
+N_leaf = 4
+ 
+resol = 15
+cut = 3
+
+folder = '1031'
+fileList = os.listdir('temp/'+folder)
+fileList.sort()
+
+numberS = [1,7,8]
+
+def ploter(numberS, color):
+	totalX = []
+	totalY = []
+	for num in numberS:
+
+		dataStorm = load('temp/'+folder+'/leaf_'+str(num))
+		(size_Y,size_X) = dataStorm[0][1].shape
+
+
+		def regular(series):
+			maxer = max(series)
+			miner = min(series)
+			result = [1.0*(ser-miner)/(maxer-miner) for ser in series]
+			return result
+
+		timeList = []
+		lumSeries = []
+		rgbSeries = []
+		for [time, lum, rgb] in dataStorm:
+				lumSeries.append(np.sum(lum))
+				rgbSeries.append(np.sum(rgb))
+				timeList.append(float(time))
+
+		xS = []
+		yS = []
+		for t in range(len(timeList)):
+			time = timeList[t]
+			if time > 70:break
+			if time > 5:
+				xS.append(time)
+				yS.append(lumSeries[t])
+		yS = regular(yS)
+		#plt.plot(xS,yS,color)
+		if len(totalY) == 0:
+			totalY = yS
+		else:
+			totalY = np.array(totalY)
+			totalY += np.array(yS) 
+	yhat = savgol_filter(totalY, 51, 3)
+	plt.plot(xS,yhat,color)
+	dump([xS,yhat],'sample')
+	print (yhat)
+	print (xS)
+	#exit()
+	peaks1, properties = find_peaks(yhat)
+	peaks2, properties = find_peaks(-yhat)
+	peaks = list(set(list(peaks1)+list(peaks2)))
+	peaks.sort()
+	for peak in peaks:
+		time = xS[peak]
+		plt.axvline(time)
+		print (time, yhat[peak])
+	return regular(yhat)
+from scipy.misc import electrocardiogram
+from scipy.signal import find_peaks
+old = ploter([33,34],'r') 
+plt.show()
+ploter([11,12],'g')
+plt.show()
+young = ploter([33,34,35,36],'b')
+plt.show()
+
+plt.show()
+
+
+
+for num in numberS:
+	file = str(num) 
+
+	dataStorm = load('temp/'+folder+'/leaf_'+str(num))
+	(size_Y,size_X) = dataStorm[0][1].shape
+
+
+	def regular(series):
+		maxer = max(series)
+		miner = min(series)
+		result = [1.0*(ser-miner)/(maxer-miner) for ser in series]
+		return result
+
+	timeList = []
+	lumSeries = []
+	rgbSeries = []
+	for [time, lum, rgb] in dataStorm:
+			lumSeries.append(np.sum(lum))
+			rgbSeries.append(np.sum(rgb))
+			timeList.append(float(time))
+
+
+	def fsigmoid(x, a, b):
+			return 1.0 / (1.0 + np.exp(a*(x-b)))
+
+	def find_half(series, timeList = timeList):
+				mid = (max(series)*0.5+min(series)*0.5)
+				N = len(series)
+				temp = []
+				for n in range(N):
+					temp.append([(series[n]-mid)**2,n])
+				temp.sort()
+				result = timeList[temp[0][1]]
+				result = result/1
+				return result
+
+	def get_lifespan(series):
+				yhat = savgol_filter(series, 51, 3)
+				N = len(yhat)
+				temp = []
+				for n in range(N):
+					temp.append([yhat[n],n])
+				temp.sort(reverse=True)
+				maxN = temp[0][1]
+				newSeries = yhat[0:maxN]
+				try:
+					return find_half(newSeries)
+				except:
+					return 0
+	def mydtw (x1, x2, window_size):
+
+	    x1
+	    x2
+	    if len(x1)>=len(x2):
+	        xx1 = x2; xx2 = x1
+	    else:
+	        xx1 = x1; xx2 = x2
+	    x1 = xx1; x2 = xx2;
+	    nx = len(x1); ny = len(x2)
+	    dmatrix = np.repeat(0, nx*ny).reshape(nx, ny)
+	    slope = min([nx/ny, ny/nx])
+	    nmax = max([nx, ny])
+	    row = np.round(slope*np.round(range(1,nmax+1)))
+	    col = np.round(range(1,nmax+1))
+	    
+	    for i in range(nx):
+	        r = col[row==(i+1)]
+	        if len(r)!=0:
+	            rmin = min(r); rmax = max(r)
+	            rlist = np.round(range(rmin-window_size), (rmax+window_size)+1)
+	            r = set(range(1, rmax+1))-set(rlist)
+	            for rr in r:
+	                dmatrix[i, int(rr-1)] = 1
+	    dmatrix[0,0] = 0; dmatrix[nx-1, ny-1] = 0
+	    np.abs(np.repeat(x1[0], ny))
+	    row1 = np.cumsum(np.abs(np.repeat(x1[0], ny)-x2))[np.where(dmatrix[0,]==0)[0]]
+	    col1 = np.cumsum(np.abs(x1-np.repeat(x2[0], nx)))[np.where(dmatrix[:,0]==0)[0]]
+	    dvalue = np.repeat(np.inf, nx*ny).reshape(nx, ny)
+	    dvalue[0, range(len(row1))] = row1;
+	    dvalue[range(len(col1)), 0] = col1;
+	    
+	    for i in range(1, nx):
+	        for j in range(1, ny):
+	            if (dmatrix[i,j]!=1):
+	                d = np.abs(x1[i]-x2[j])
+	                dist = [dvalue[i-1, j-1]+2*d, dvalue[i-1, j]+d, dvalue[i, j-1]+d]
+	                dist = min(dist)
+	                dvalue[i, j] = dist
+	    route_row, route_col = np.where(dmatrix!=1)
+	    distance = dvalue[max(route_row), max(route_col)]
+	    n = max(route_row)+max(route_col)+2
+	    normalizedDistance = distance/n
+	    
+	    result = { 'distanceMatrix' : dvalue, 'distance' : distance, 'normalizedDistance' : normalizedDistance }
+	    return normalizedDistance
+
+
+	def get_period(series):
+				tempLum = []
+				for t in range(len(timeList)):
+					time = timeList[t]
+					if time > 70:
+						break
+					if time > 5:
+						tempLum.append(series[t])
+
+				tempLum = regular(savgol_filter(tempLum, 51, 3))
+				#print (tempLum)
+				#print (old)
+				diff_old = np.sum(abs(np.array(tempLum) - old))
+				diff_young = np.sum(abs(np.array(tempLum) - young))
+				#diff_old = mydtw(np.array(tempLum),old,3)
+				#diff_young = mydtw(np.array(tempLum),young,3)
+				return diff_young/diff_old
+
+	lifegram = np.zeros((size_Y,size_X))
+	periodgram = np.zeros((size_Y,size_X))
+	periodS = []
+	tempList = []
+	lifespanS = []
+	minPeriod = 20
+	maxPeriod = 28
+	minLifespan = 40
+	maxLifespan = 200
+	for x in range(size_X):
+		print(x,size_X)
+		for y in range(size_Y):
+			lifegram[y,x] = None
+			periodgram[y,x] = None
+			if dataStorm[0][1][y,x]:
+				lumSeries = [ np.nansum(cybers[1][y-1:y+2,x-1:x+2]) for cybers in dataStorm]
+				rgbSeries = [np.nansum(cybers[2][y-1:y+2,x-1:x+2][0])  for cybers in dataStorm]
+				period = get_period(lumSeries)
+				lifespan = get_lifespan(rgbSeries)
+				if period:
+					periodgram[y,x] = period
+				if lifespan > minLifespan and lifespan < maxLifespan:
+					lifegram[y,x] = lifespan
+				if lifespan > minLifespan and lifespan < maxLifespan:
+						periodS.append(period)
+						lifespanS.append(lifespan)
+						tempList.append([period,lifespan])
+
+	if 0:
+		p2l = dict()
+		l2p = dict()
+
+		for [period,lifespan] in tempList:
+			nnp = round(period,0)
+			nl = round(lifespan,-1)
+			if not nnp in p2l.keys():
+				p2l[nnp] = []
+			if not nl in l2p.keys():
+				l2p[nl] = []
+			print (nnp, nl)
+			p2l[nnp].append(lifespan)
+			l2p[nl].append(period)
+
+		periodS = list(p2l.keys())
+		print (periodS)
+		periodS.sort()
+		period2lifespan = []
+		for period in periodS:
+			period2lifespan.append(np.mean(p2l[period]))
+
+
+		lifespanS = list(l2p.keys())
+		lifespanS.sort()
+		lifespan2period = []
+		for lifespan in lifespanS:
+			lifespan2period.append(np.mean(l2p[lifespan]))
+
+
+	def outout(mat, ratio=0.01):
+		flatter = mat.flatten()
+		temp = []
+		for value in flatter:
+			if value > 1:
+				temp.append(value)
+		temp.sort()
+		tempN = len(temp)
+		lower = temp[int(tempN*ratio)]
+		upper = temp[int(tempN*(1-ratio))]
+		(tempY, tempX) = np.shape(mat)
+		resultMat = np.zeros((tempY,tempX))
+		for y in range(tempY):
+			for x in range(tempX):
+				resultMat[y,x] = None
+				if mat[y,x] > 1:
+					value = mat[y,x]
+					if value > upper:
+						value = upper
+					if value < lower:
+						value = lower
+					resultMat[y,x] = value
+		return resultMat
+
+
+	def divider(Xlist, Ylist, iN):
+		xn = len(Xlist)
+		temp = Xlist[:]
+		temp.sort()
+		threshould = [temp[int(xn/iN*i)] for i in range(1,iN)]
+		newX = []
+		newY = []
+		resultDict = dict()
+		for n in range(xn):
+			x = Xlist[n]
+			y = Ylist[n]
+			interver = 0
+			for i in range(iN-1):
+				if threshould[i] < x:
+					interver = i+1
+			if not interver in resultDict.keys():
+				resultDict[interver] = [[],[]]
+			resultDict[interver][0].append(x)
+			resultDict[interver][1].append(y)
+		returnDict = dict()
+		for i in range(iN):
+			[tempx, tempy] = resultDict[i]
+			interName = round(np.mean(tempx),1)
+			returnDict[interName] = tempy
+		return returnDict
+
+
+
+	cmap = plt.cm.gist_rainbow
+	cmap.set_bad(color='black')
+
+
+	if 1:
+		plt.figure(figsize=(10, 10))
+
+		plt.subplot(1,2,1)
+		cmap = plt.cm.gist_rainbow_r
+		cmap.set_bad(color='black')
+		#periodFig = outout(periodgram)
+		periodFig = periodgram
+		plt.imshow(periodFig, cmap=cmap, interpolation='nearest')
+		plt.subplot(1,2,2)
+		cmap = plt.cm.gist_rainbow
+		cmap.set_bad(color='black')
+
+		lifeFig = outout(lifegram)
+		plt.imshow(lifeFig, cmap=cmap, interpolation='nearest')
+		plt.show()
+		plt.subplot(3,2,3)
+		#plt.plot(lifespanS ,lifespan2period, 'x')
+		l2p = divider(lifespanS,periodS,5)
+		keyLifeS = list(l2p.keys())
+		keyLifeS.sort()
+		plt.clf()
+		plt.boxplot([l2p[lifespan] for lifespan in keyLifeS], showfliers=False)
+		plt.xticks([n+1 for n in range(len(keyLifeS))],keyLifeS)
+		plt.tick_params(labelsize=20)
+		plt.xlabel('Half-life(h)', fontsize=20)
+		plt.ylabel('Period(h)', fontsize=20)
+		plt.show()
+		plt.subplot(3,2,4)
+		p2l = divider(periodS,lifespanS,5)
+		keyPeriodS = list(p2l.keys())
+		keyPeriodS.sort()
+
+		plt.boxplot([p2l[period] for period in keyPeriodS], showfliers=False)
+		plt.xticks([n+1 for n in range(len(keyPeriodS))],keyPeriodS)
+		#plt.plot(periodS ,period2lifespan, 'x')
+		plt.subplot(3,2,5)
+		lumSeries = []
+		rgbSeries = []
+		for [time, lum, rgb] in dataStorm:
+			lumSeries.append(np.nansum(lum))
+			rgbSeries.append(np.nansum(rgb))
+		lumSeries = savgol_filter(lumSeries, 51, 3)
+		rgbSeries = savgol_filter(rgbSeries, 51, 3)
+		plt.plot(timeList, regular(lumSeries),'r',label='lum')
+		plt.plot(timeList, regular(rgbSeries),'b',label='rgb')
+		plt.legend(loc='upper right', fontsize=17)
+		period = get_period(lumSeries)
+		lifespan = get_lifespan(rgbSeries)
+		plt.subplot(3,2,6)
+		plt.text(0,0.1,'period: ' + str(round(period,1))+'h')
+		plt.text(0,0.2,'lifespan: ' + str(round(lifespan,1))+'h')
+		plt.text(0,0.3,'leaf#: ' + file)
+		plt.xlim(-0.1,0.2)
+		plt.axis('off')
+
+		try:os.mkdir('temp2/'+folder)
+		except:pass
+		try:os.mkdir('CheckFigS/'+folder)
+		except:pass
+
+		print ('Complete!')
+
+		plt.savefig('CheckFigS/'+folder+'/'+file+'png')
+		plt.cla()
+
+		dataPack = [dataStorm, lifegram, periodgram, timeList, p2l, l2p]
+		dump(dataPack, 'temp2/'+folder+'/'+file)
+		print (file, 'DONE!')
+
+
+
+
+
+	def rescaleMat(mat, factor = 100):
+		flatter = mat.flatten()
+		maxele = np.nanmax(flatter)
+		minele = np.nanmin(flatter)
+		#print (maxele,minele)
+		#midele = np.median(flatter)
+		#flatter.sort()
+		#midele = flatter[int(len(flatter)*0.9)]
+		return 1.0*(mat-minele)/(maxele-minele)*factor
+
+
+
+	def click(event):
+		global scaleFactor, canvas
+		x = int(event.x/scaleFactor)
+		y = int(event.y/scaleFactor)
+		rgbSeries = [(cybers[2][y,x][0]) for cybers in dataStorm]
+		lifespan = get_lifespan(rgbSeries)
+		plt.plot(timeList, regular(rgbSeries))
+		plt.axvline(lifespan)
+		print(lifespan)
+		plt.show()
+
+
+	if 0:
+		from tkinter import *
+		from PIL import Image, ImageTk, ImageEnhance
+		from matplotlib import cm
+		maxSize = 800
+		root = Tk()
+		root.title("Cropper")
+		root.geometry(str(maxSize)+'x'+str(maxSize))
+		scaleFactor = maxSize/max([size_Y,size_X])
+		(sub_x, sub_y) = (int(size_X*scaleFactor),int(size_Y*scaleFactor))
+		canvas = Canvas(root, width = sub_x, height = sub_y)
+		canvas.pack()
+
+		colorMat = np.uint8((cmap(rescaleMat(lifegram,1.0)))*255)
+		for x in range(size_X):
+			for y in range(size_Y):
+				if not lifegram[y,x] > 30:
+					colorMat[y,x] = [0,0,0,255]
+		#plt.imshow(lifegram)
+		#plt.show()
+		img = Image.fromarray(colorMat)
+		img = img.resize((sub_x,sub_y))
+		img = ImageTk.PhotoImage(img)
+
+		canvas.create_image(0,0,image=img, anchor = 'nw')
+		root.bind('<Button 1>', click)
+		root.mainloop()
